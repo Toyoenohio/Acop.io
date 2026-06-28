@@ -92,11 +92,11 @@ const supabaseKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
   </div>
 </Layout>
 
-<script>
+<script define:vars={{ SUPABASE_URL: supabaseUrl, SUPABASE_KEY: supabaseKey }}>
   // Polling liviano: actualiza solo los íconos que cambiaron, cada 60s.
   // Sin WebSocket, sin full page reload. Funciona en 2G.
-  const API = '{supabaseUrl}/rest/v1/center_needs?select=center_id,category,active';
-  const KEY = '{supabaseKey}';
+  const API = SUPABASE_URL + '/rest/v1/center_needs?select=center_id,category,active';
+  const KEY = SUPABASE_KEY;
   
   const iconMap = {
     Agua:    { bg:'bg-blue-50',   border:'border-blue-200',   icon:'text-blue-500',   label:'💧' },
