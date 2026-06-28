@@ -1,0 +1,117 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Iniciar Sesión">
+  <div class="flex flex-col items-center justify-center min-h-[70dvh]">
+    
+    <!-- Logo + Welcome -->
+    <div class="text-center mb-8 animate-fade-up">
+      <div class="bg-bento-primary w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-bento-text" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+        </svg>
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">Bienvenido</h2>
+      <p class="text-sm sm:text-base text-bento-muted font-medium mt-2">Inicia sesión para gestionar tu centro</p>
+    </div>
+
+    <!-- Login Card -->
+    <div class="w-full max-w-sm animate-fade-up delay-1">
+      <form id="login-form" class="card-bento flex flex-col gap-5">
+        <div>
+          <label for="email" class="block text-sm font-semibold text-bento-text mb-2">Correo electrónico</label>
+          <input 
+            type="email" 
+            id="email" 
+            name="email" 
+            required 
+            autocomplete="email"
+            class="input-bento"
+            placeholder="tu@correo.com"
+          />
+        </div>
+        
+        <div>
+          <label for="password" class="block text-sm font-semibold text-bento-text mb-2">Contraseña</label>
+          <input 
+            type="password" 
+            id="password" 
+            name="password" 
+            required 
+            autocomplete="current-password"
+            class="input-bento"
+            placeholder="••••••••"
+          />
+        </div>
+
+        <div id="error-message" class="hidden text-sm font-semibold p-3 rounded-xl text-center bg-red-50 text-bento-danger border border-red-100">
+          Credenciales incorrectas
+        </div>
+        
+        <button 
+          type="submit" 
+          id="login-btn"
+          class="btn-primary mt-1"
+        >
+          <span id="btn-text">Entrar</span>
+          <svg id="btn-spinner" class="hidden animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+          </svg>
+        </button>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  const loginForm = document.getElementById('login-form');
+  const errorMsg = document.getElementById('error-message');
+  const loginBtn = document.getElementById('login-btn') as HTMLButtonElement;
+  const btnText = document.getElementById('btn-text');
+  const btnSpinner = document.getElementById('btn-spinner');
+
+  loginForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = (document.getElementById('email') as HTMLInputElement).value;
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+    
+    // Show loading
+    if (errorMsg) errorMsg.classList.add('hidden');
+    if (loginBtn) loginBtn.disabled = true;
+    if (btnText) btnText.textContent = 'Entrando...';
+    if (btnSpinner) btnSpinner.classList.remove('hidden');
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error(error);
+      if (errorMsg) {
+        errorMsg.classList.remove('hidden');
+        errorMsg.textContent = "Correo o contraseña incorrectos.";
+      }
+      if (loginBtn) loginBtn.disabled = false;
+      if (btnText) btnText.textContent = 'Entrar';
+      if (btnSpinner) btnSpinner.classList.add('hidden');
+    } else {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single();
+        
+      if (profile?.role === 'super_admin') {
+        window.location.href = '/admin';
+      } else {
+        window.location.href = '/dashboard';
+      }
+    }
+  });
+</script>

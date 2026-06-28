@@ -1,0 +1,178 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bento-primary: #FAD4C0;
+  --color-bento-primary-dark: #f0b99a;
+  --color-bento-secondary: #80A1C1;
+  --color-bento-success: #16A34A;
+  --color-bento-warning: #D97706;
+  --color-bento-danger: #DC2626;
+  --color-bento-surface: #FFF5E6;
+  --color-bento-card: #FFFFFF;
+  --color-bento-text: #111827;
+  --color-bento-muted: #6B7280;
+
+  --font-sans: 'Inter', sans-serif;
+}
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    background-color: var(--color-bento-surface);
+    color: var(--color-bento-text);
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    background-color: var(--color-bento-primary);
+    color: var(--color-bento-text);
+  }
+}
+
+@layer utilities {
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    background-color: var(--color-bento-primary);
+    color: var(--color-bento-text);
+    font-weight: 700;
+    font-size: 0.9375rem;
+    padding: 0.875rem 1.5rem;
+    border-radius: 1rem;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    width: 100%;
+    cursor: pointer;
+    border: none;
+  }
+
+  .btn-primary:hover {
+    background-color: var(--color-bento-primary-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(250, 212, 192, 0.4);
+  }
+
+  .btn-primary:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  @media (min-width: 640px) {
+    .btn-primary {
+      width: auto;
+    }
+  }
+
+  .card-bento {
+    background-color: var(--color-bento-card);
+    border-radius: 1.25rem;
+    padding: 1.25rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+    border: 1px solid rgba(250, 212, 192, 0.15);
+    transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  @media (min-width: 640px) {
+    .card-bento {
+      border-radius: 1.75rem;
+      padding: 1.75rem;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .card-bento {
+      border-radius: 2rem;
+      padding: 2rem;
+    }
+  }
+
+  .card-bento-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.03);
+  }
+
+  .input-bento {
+    width: 100%;
+    background-color: var(--color-bento-surface);
+    border: 2px solid transparent;
+    color: var(--color-bento-text);
+    padding: 0.875rem 1rem;
+    border-radius: 0.875rem;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    outline: none;
+  }
+
+  .input-bento::placeholder {
+    color: var(--color-bento-muted);
+    font-weight: 400;
+  }
+
+  .input-bento:focus {
+    border-color: var(--color-bento-primary);
+    background-color: white;
+    box-shadow: 0 0 0 3px rgba(250, 212, 192, 0.3);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.375rem 0.75rem;
+    border-radius: 624rem;
+    white-space: nowrap;
+  }
+
+  /* Fade-in animation for page content */
+  @keyframes fadeUp {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fadeUp 500ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+    opacity: 0;
+  }
+
+  /* Staggered animation delay */
+  .delay-1 { animation-delay: 50ms; }
+  .delay-2 { animation-delay: 100ms; }
+  .delay-3 { animation-delay: 150ms; }
+  .delay-4 { animation-delay: 200ms; }
+
+  /* Pulse dot for "receiving" state */
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  .pulse-dot {
+    animation: pulse-dot 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}

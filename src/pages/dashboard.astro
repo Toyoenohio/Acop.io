@@ -1,0 +1,188 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Panel de Gestor">
+  <div class="flex flex-col gap-5 sm:gap-6">
+    
+    <!-- Header Bar -->
+    <div class="card-bento flex items-center justify-between !bg-bento-secondary/10 !border-bento-secondary/20 animate-fade-up">
+      <div>
+        <h2 class="text-lg sm:text-xl font-extrabold text-bento-text">Mis Centros</h2>
+        <p class="text-xs sm:text-sm text-bento-muted font-medium mt-0.5">Gestor de Acopio</p>
+      </div>
+      <button id="logout-btn" class="text-xs sm:text-sm font-bold text-bento-danger bg-white px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors active:scale-[0.97]">
+        Salir
+      </button>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loading" class="card-bento flex flex-col justify-center items-center py-16 gap-3 animate-fade-up">
+      <div class="w-8 h-8 border-3 border-bento-secondary border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-sm text-bento-muted font-medium">Cargando tus centros...</p>
+    </div>
+
+    <!-- Auth Content (hidden until verified) -->
+    <div id="auth-content" class="hidden flex-col gap-5 sm:gap-6">
+      <div id="centers-container" class="flex flex-col gap-5 sm:gap-6"></div>
+      <div id="empty-msg" class="hidden text-center py-16 card-bento animate-fade-up">
+        <span class="text-4xl block mb-3">🔗</span>
+        <p class="text-base font-bold text-bento-text mb-1">Sin centros asignados</p>
+        <p class="text-sm text-bento-muted font-medium">Contacta al administrador para que te asigne un centro.</p>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  const authContent = document.getElementById('auth-content');
+  const loading = document.getElementById('loading');
+  const logoutBtn = document.getElementById('logout-btn');
+  const centersContainer = document.getElementById('centers-container');
+  const emptyMsg = document.getElementById('empty-msg');
+
+  let sessionUser: any = null;
+
+  async function init() {
+    const { data: sessionUser, error: authError } = await supabase.auth.getSession();
+    
+    if (!sessionUser.session) {
+      window.location.href = '/login';
+      return;
+    }
+    
+    const user = sessionUser.session.user;
+    
+    const { data: centers, error } = await supabase
+      .from('centers')
+      .select(`
+        id,
+        name,
+        center_needs (
+          id,
+          category,
+          active
+        )
+      `)
+      .eq('manager_id', user.id);
+
+    if (loading && authContent) {
+      loading.classList.add('hidden');
+      authContent.classList.remove('hidden');
+      authContent.classList.add('flex');
+    }
+
+    if (centers && centers.length > 0) {
+      renderCenters(centers);
+    } else {
+      if (emptyMsg) emptyMsg.classList.remove('hidden');
+    }
+  }
+
+  const emojiMap: Record<string, string> = {
+    'Agua': '💧',
+    'Comida': '🍎',
+    'Medicina': '💊',
+    'Ropa': '👕'
+  };
+
+  const colorMap: Record<string, { active: string; inactive: string }> = {
+    'Agua': { active: 'bg-blue-50 border-blue-200 text-blue-700', inactive: 'bg-gray-50 border-gray-200 text-gray-400' },
+    'Comida': { active: 'bg-orange-50 border-orange-200 text-orange-700', inactive: 'bg-gray-50 border-gray-200 text-gray-400' },
+    'Medicina': { active: 'bg-red-50 border-red-200 text-red-700', inactive: 'bg-gray-50 border-gray-200 text-gray-400' },
+    'Ropa': { active: 'bg-purple-50 border-purple-200 text-purple-700', inactive: 'bg-gray-50 border-gray-200 text-gray-400' },
+  };
+
+  function renderCenters(centers: any[]) {
+    if (!centersContainer) return;
+    centersContainer.innerHTML = '';
+
+    centers.forEach((center, i) => {
+      const card = document.createElement('div');
+      card.className = `card-bento animate-fade-up delay-${Math.min(i + 1, 4)}`;
+      
+      const title = document.createElement('h3');
+      title.className = 'text-base sm:text-lg font-bold text-bento-text mb-5 pb-3 border-b border-gray-100 flex items-center gap-2';
+      title.innerHTML = `<span class="text-lg">🏠</span> ${center.name}`;
+      card.appendChild(title);
+
+      const needsGrid = document.createElement('div');
+      needsGrid.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3';
+
+      center.center_needs?.forEach((need: any) => {
+        const needWrapper = document.createElement('div');
+        const colors = colorMap[need.category] || colorMap['Agua'];
+        const currentColor = need.active ? colors.active : colors.inactive;
+        needWrapper.className = `flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-200 ${currentColor}`;
+        
+        const leftSide = document.createElement('div');
+        leftSide.className = 'flex items-center gap-3';
+        
+        const emoji = document.createElement('span');
+        emoji.className = `text-xl ${need.active ? '' : 'grayscale opacity-50'}`;
+        emoji.textContent = emojiMap[need.category] || '📦';
+        
+        const label = document.createElement('span');
+        label.className = 'text-sm font-bold';
+        label.textContent = need.category;
+
+        leftSide.appendChild(emoji);
+        leftSide.appendChild(label);
+        
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = `px-4 py-2 rounded-xl font-bold text-xs transition-all duration-200 active:scale-[0.95] ${
+          need.active 
+            ? 'bg-white/80 text-green-700 shadow-sm' 
+            : 'bg-white/80 text-gray-500 shadow-sm'
+        }`;
+        toggleBtn.textContent = need.active ? '✓ Activo' : '✗ Lleno';
+        
+        toggleBtn.onclick = async () => {
+          toggleBtn.disabled = true;
+          toggleBtn.textContent = '...';
+          const newStatus = !need.active;
+          
+          const { error } = await supabase
+            .from('center_needs')
+            .update({ active: newStatus })
+            .eq('id', need.id);
+            
+          if (!error) {
+            need.active = newStatus;
+            const newColor = newStatus ? colors.active : colors.inactive;
+            needWrapper.className = `flex items-center justify-between gap-3 p-3.5 rounded-2xl border transition-all duration-200 ${newColor}`;
+            emoji.className = `text-xl ${newStatus ? '' : 'grayscale opacity-50'}`;
+            toggleBtn.className = `px-4 py-2 rounded-xl font-bold text-xs transition-all duration-200 active:scale-[0.95] ${
+              newStatus 
+                ? 'bg-white/80 text-green-700 shadow-sm' 
+                : 'bg-white/80 text-gray-500 shadow-sm'
+            }`;
+            toggleBtn.textContent = newStatus ? '✓ Activo' : '✗ Lleno';
+          } else {
+            toggleBtn.textContent = '¡Error!';
+            setTimeout(() => {
+              toggleBtn.textContent = need.active ? '✓ Activo' : '✗ Lleno';
+            }, 2000);
+          }
+          toggleBtn.disabled = false;
+        };
+
+        needWrapper.appendChild(leftSide);
+        needWrapper.appendChild(toggleBtn);
+        needsGrid.appendChild(needWrapper);
+      });
+
+      card.appendChild(needsGrid);
+      centersContainer.appendChild(card);
+    });
+  }
+
+  init();
+
+  logoutBtn?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  });
+</script>

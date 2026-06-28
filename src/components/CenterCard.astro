@@ -1,0 +1,65 @@
+---
+import CategoryIcon from './CategoryIcon.astro';
+
+interface Props {
+  name: string;
+  address: string;
+  contact: string;
+  needs: {
+    Ropa: boolean;
+    Medicina: boolean;
+    Agua: boolean;
+    Comida: boolean;
+  };
+}
+
+const { name, address, contact, needs } = Astro.props;
+
+const activeCount = Object.values(needs).filter(Boolean).length;
+const totalCount = Object.values(needs).length;
+---
+
+<article class="card-bento card-bento-hover flex flex-col gap-4 sm:gap-5 w-full animate-fade-up">
+  
+  <!-- Header: Name + Status Badge -->
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <h2 class="text-lg sm:text-xl font-extrabold text-bento-text tracking-tight leading-snug">{name}</h2>
+      <div class="flex items-center gap-1.5 mt-1.5 text-xs sm:text-sm text-bento-muted font-medium">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 flex-shrink-0 text-bento-secondary" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+        <span class="truncate">{address}</span>
+      </div>
+    </div>
+    
+    {activeCount > 0 ? (
+      <span class="badge bg-bento-success/10 text-bento-success border border-bento-success/20 flex-shrink-0">
+        <span class="w-1.5 h-1.5 rounded-full bg-bento-success pulse-dot"></span>
+        {activeCount}/{totalCount}
+      </span>
+    ) : (
+      <span class="badge bg-gray-100 text-gray-500 border border-gray-200 flex-shrink-0">
+        Completo
+      </span>
+    )}
+  </div>
+
+  <!-- Contact -->
+  <a href={`tel:${contact}`} class="inline-flex items-center gap-2 text-sm font-semibold text-bento-text bg-bento-surface px-3 py-2 rounded-xl hover:bg-bento-primary/20 transition-colors w-fit active:scale-[0.98]">
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-bento-success flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+    </svg>
+    {contact}
+  </a>
+
+  <!-- Needs Grid -->
+  <div class="grid grid-cols-2 gap-2 sm:gap-3">
+    <CategoryIcon category="Agua" active={needs.Agua} />
+    <CategoryIcon category="Comida" active={needs.Comida} />
+    <CategoryIcon category="Medicina" active={needs.Medicina} />
+    <CategoryIcon category="Ropa" active={needs.Ropa} />
+  </div>
+
+</article>

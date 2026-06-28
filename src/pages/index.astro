@@ -1,0 +1,91 @@
+---
+import Layout from '../layouts/Layout.astro';
+import CenterCard from '../components/CenterCard.astro';
+import { supabase } from '../lib/supabase';
+
+export const prerender = false;
+
+const { data: centersData, error } = await supabase
+  .from('centers')
+  .select(`
+    id,
+    name,
+    address,
+    contact,
+    center_needs (
+      category,
+      active
+    )
+  `)
+  .order('created_at', { ascending: false });
+
+if (error) {
+  console.error('Error fetching centers:', error);
+}
+
+const centers = centersData?.map((center: any) => {
+  const needs = {
+    Ropa: false,
+    Medicina: false,
+    Agua: false,
+    Comida: false
+  };
+  
+  if (center.center_needs) {
+    center.center_needs.forEach((need: any) => {
+      needs[need.category as keyof typeof needs] = need.active;
+    });
+  }
+  
+  return {
+    ...center,
+    needs
+  };
+}) || [];
+---
+
+<Layout title="Inicio">
+  <!-- Page Header -->
+  <div class="mb-6 sm:mb-8 animate-fade-up">
+    <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">
+      Centros de Acopio
+    </h1>
+    <p class="text-sm sm:text-base text-bento-muted font-medium mt-1.5 leading-relaxed">
+      Estado actual en <strong class="text-bento-text">Anzoátegui</strong>
+    </p>
+  </div>
+
+  <!-- Legend -->
+  <div class="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8 text-xs sm:text-sm font-semibold text-bento-muted animate-fade-up delay-1">
+    <span class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-bento-success pulse-dot"></span>
+      Recibiendo
+    </span>
+    <span class="flex items-center gap-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
+      Lleno
+    </span>
+  </div>
+
+  <!-- Centers List -->
+  <div class="flex flex-col gap-4 sm:gap-5">
+    {centers.length === 0 ? (
+      <div class="text-center py-16 sm:py-24 card-bento animate-fade-up delay-2">
+        <div class="text-5xl mb-4">📦</div>
+        <p class="text-base font-bold text-bento-text mb-1">Sin centros registrados</p>
+        <p class="text-sm text-bento-muted font-medium">Pronto habrá centros disponibles en tu zona.</p>
+      </div>
+    ) : (
+      centers.map((center: any, i: number) => (
+        <div class={`animate-fade-up delay-${Math.min(i + 1, 4)}`}>
+          <CenterCard 
+            name={center.name} 
+            address={center.address} 
+            contact={center.contact} 
+            needs={center.needs} 
+          />
+        </div>
+      ))
+    )}
+  </div>
+</Layout>

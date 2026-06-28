@@ -1,0 +1,200 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Panel Súper Admin">
+  <div class="flex flex-col gap-5 sm:gap-6">
+    
+    <!-- Header Bar -->
+    <div class="card-bento flex items-center justify-between !bg-bento-primary/10 !border-bento-primary/20 animate-fade-up">
+      <div>
+        <h2 class="text-lg sm:text-xl font-extrabold text-bento-text">Panel Admin</h2>
+        <p class="text-xs sm:text-sm text-bento-muted font-medium mt-0.5">Súper Administrador</p>
+      </div>
+      <button id="logout-btn" class="text-xs sm:text-sm font-bold text-bento-danger bg-white px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors active:scale-[0.97]">
+        Salir
+      </button>
+    </div>
+
+    <!-- Auth Content (hidden until verified) -->
+    <div id="auth-content" class="hidden flex-col gap-5 sm:gap-6">
+      
+      <!-- Create Center Form -->
+      <section class="card-bento animate-fade-up delay-1">
+        <h3 class="text-base sm:text-lg font-bold text-bento-text mb-5 pb-3 border-b border-gray-100 flex items-center gap-2">
+          <span class="text-lg">➕</span> Nuevo centro de acopio
+        </h3>
+        
+        <form id="create-center-form" class="flex flex-col gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-bento-text mb-2">Nombre del centro</label>
+            <input type="text" id="center-name" required class="input-bento" placeholder="Ej. Bomberos de Lechería">
+          </div>
+          
+          <div>
+            <label class="block text-sm font-semibold text-bento-text mb-2">Dirección</label>
+            <input type="text" id="center-address" required class="input-bento" placeholder="Av. Principal de Lechería">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-bento-text mb-2">Teléfono de contacto</label>
+            <input type="tel" id="center-contact" required class="input-bento" placeholder="0414-0000000">
+          </div>
+          
+          <button type="submit" id="submit-btn" class="btn-primary mt-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            Crear Centro
+          </button>
+          
+          <div id="form-msg" class="hidden text-sm font-semibold p-3 rounded-xl text-center"></div>
+        </form>
+      </section>
+
+      <!-- Centers List -->
+      <section class="animate-fade-up delay-2">
+        <h3 class="text-base sm:text-lg font-bold text-bento-text mb-4 flex items-center gap-2">
+          <span class="text-lg">📋</span> Centros registrados
+        </h3>
+        <div id="centers-list" class="flex flex-col gap-3">
+          <div class="text-center py-8 text-bento-muted text-sm font-medium">Cargando centros...</div>
+        </div>
+      </section>
+    </div>
+    
+    <!-- Loading State -->
+    <div id="loading" class="card-bento flex flex-col justify-center items-center py-16 gap-3 animate-fade-up">
+      <div class="w-8 h-8 border-3 border-bento-primary border-t-transparent rounded-full animate-spin"></div>
+      <p class="text-sm text-bento-muted font-medium">Verificando acceso...</p>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  const authContent = document.getElementById('auth-content');
+  const loading = document.getElementById('loading');
+  const logoutBtn = document.getElementById('logout-btn');
+  const formMsg = document.getElementById('form-msg');
+  const form = document.getElementById('create-center-form');
+  const centersList = document.getElementById('centers-list');
+
+  async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      window.location.href = '/login';
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profileError || !profile) {
+      console.error("Error al buscar perfil:", profileError);
+      if (loading) loading.innerHTML = `<p class="text-bento-danger font-bold text-center">Error: No tienes un perfil creado en la base de datos.<br><span class="text-sm text-bento-muted font-normal mt-2 block">Necesitas ejecutar el script de Trigger en Supabase.</span></p>`;
+      return;
+    }
+
+    if (profile.role !== 'super_admin') {
+      window.location.href = '/dashboard';
+      return;
+    }
+
+    if (loading && authContent) {
+      loading.classList.add('hidden');
+      authContent.classList.remove('hidden');
+      authContent.classList.add('flex');
+    }
+
+    loadCenters();
+  }
+
+  async function loadCenters() {
+    if (!centersList) return;
+
+    const { data: centers, error } = await supabase
+      .from('centers')
+      .select('id, name, address, contact')
+      .order('created_at', { ascending: false });
+
+    if (error || !centers || centers.length === 0) {
+      centersList.innerHTML = `
+        <div class="text-center py-8 card-bento text-bento-muted text-sm font-medium">
+          <span class="text-2xl block mb-2">📦</span>
+          No has creado ningún centro aún.
+        </div>`;
+      return;
+    }
+
+    centersList.innerHTML = centers.map(c => `
+      <div class="card-bento flex items-center gap-3 !p-4">
+        <div class="bg-bento-primary/20 w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0">
+          <span class="text-base">🏠</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-bold text-bento-text truncate">${c.name}</p>
+          <p class="text-xs text-bento-muted truncate">${c.address}</p>
+        </div>
+        <span class="text-xs font-semibold text-bento-muted bg-bento-surface px-2 py-1 rounded-lg flex-shrink-0">${c.contact}</span>
+      </div>
+    `).join('');
+  }
+
+  checkAuth();
+
+  logoutBtn?.addEventListener('click', async () => {
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+    if (btn) btn.disabled = true;
+
+    const name = (document.getElementById('center-name') as HTMLInputElement).value;
+    const address = (document.getElementById('center-address') as HTMLInputElement).value;
+    const contact = (document.getElementById('center-contact') as HTMLInputElement).value;
+
+    const { data, error } = await supabase
+      .from('centers')
+      .insert([{ name, address, contact }])
+      .select()
+      .single();
+
+    if (formMsg) {
+      formMsg.classList.remove('hidden');
+      formMsg.className = 'text-sm font-semibold p-3 rounded-xl text-center';
+      
+      if (error) {
+        formMsg.classList.add('bg-red-50', 'text-bento-danger', 'border', 'border-red-100');
+        formMsg.textContent = "Error: " + error.message;
+      } else {
+        const categories = ['Ropa', 'Medicina', 'Agua', 'Comida'];
+        const needsData = categories.map(cat => ({
+          center_id: data.id,
+          category: cat,
+          active: true
+        }));
+        
+        await supabase.from('center_needs').insert(needsData);
+
+        formMsg.classList.add('bg-green-50', 'text-bento-success', 'border', 'border-green-100');
+        formMsg.textContent = "✅ Centro creado con éxito";
+        (form as HTMLFormElement).reset();
+        
+        loadCenters();
+        
+        setTimeout(() => { formMsg.classList.add('hidden'); }, 3000);
+      }
+    }
+    
+    if (btn) btn.disabled = false;
+  });
+</script>
