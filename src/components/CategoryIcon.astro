@@ -2,11 +2,11 @@
 interface Props {
   category: 'Ropa' | 'Medicina' | 'Agua' | 'Comida';
   active: boolean;
+  centerId: string;
 }
 
-const { category, active } = Astro.props;
+const { category, active, centerId } = Astro.props;
 
-// Category-specific accent colors when active
 const accentMap = {
   Agua: { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'text-blue-500', label: '💧' },
   Comida: { bg: 'bg-orange-50', border: 'border-orange-200', icon: 'text-orange-500', label: '🍎' },
@@ -18,7 +18,10 @@ const accent = accentMap[category];
 ---
 
 {active ? (
-  <div class={`flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl ${accent.bg} border ${accent.border} transition-all duration-200`}>
+  <div class={`need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl ${accent.bg} border ${accent.border} transition-all duration-200`}
+       data-center-id={centerId}
+       data-category={category}
+       data-active="true">
     <span class="text-xl sm:text-2xl" role="img" aria-label={category}>{accent.label}</span>
     <div class="flex flex-col min-w-0">
       <span class="text-sm font-bold text-bento-text leading-tight">{category}</span>
@@ -26,7 +29,10 @@ const accent = accentMap[category];
     </div>
   </div>
 ) : (
-  <div class="flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-50 transition-all duration-200">
+  <div class={`need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-50 transition-all duration-200`}
+       data-center-id={centerId}
+       data-category={category}
+       data-active="false">
     <span class="text-xl sm:text-2xl grayscale" role="img" aria-label={category}>{accent.label}</span>
     <div class="flex flex-col min-w-0">
       <span class="text-sm font-bold text-gray-400 leading-tight">{category}</span>

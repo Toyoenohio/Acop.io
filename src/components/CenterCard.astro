@@ -5,6 +5,7 @@ interface Props {
   name: string;
   address: string;
   contact: string;
+  centerId: string;
   needs: {
     Ropa: boolean;
     Medicina: boolean;
@@ -13,13 +14,13 @@ interface Props {
   };
 }
 
-const { name, address, contact, needs } = Astro.props;
+const { name, address, contact, centerId, needs } = Astro.props;
 
 const activeCount = Object.values(needs).filter(Boolean).length;
 const totalCount = Object.values(needs).length;
 ---
 
-<article class="card-bento card-bento-hover flex flex-col gap-4 sm:gap-5 w-full animate-fade-up">
+<article class="card-bento card-bento-hover flex flex-col gap-4 sm:gap-5 w-full animate-fade-up" data-center-id={centerId}>
   
   <!-- Header: Name + Status Badge -->
   <div class="flex items-start justify-between gap-3">
@@ -56,10 +57,10 @@ const totalCount = Object.values(needs).length;
 
   <!-- Needs Grid -->
   <div class="grid grid-cols-2 gap-2 sm:gap-3">
-    <CategoryIcon category="Agua" active={needs.Agua} />
-    <CategoryIcon category="Comida" active={needs.Comida} />
-    <CategoryIcon category="Medicina" active={needs.Medicina} />
-    <CategoryIcon category="Ropa" active={needs.Ropa} />
+    <CategoryIcon category="Agua" active={needs.Agua} centerId={centerId} />
+    <CategoryIcon category="Comida" active={needs.Comida} centerId={centerId} />
+    <CategoryIcon category="Medicina" active={needs.Medicina} centerId={centerId} />
+    <CategoryIcon category="Ropa" active={needs.Ropa} centerId={centerId} />
   </div>
 
 </article>

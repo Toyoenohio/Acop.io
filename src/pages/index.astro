@@ -13,6 +13,7 @@ const { data: centersData, error } = await supabase
     address,
     contact,
     center_needs (
+      id,
       category,
       active
     )
@@ -52,6 +53,7 @@ const centers = centersData?.map((center: any) => {
     </h1>
     <p class="text-sm sm:text-base text-bento-muted font-medium mt-1.5 leading-relaxed">
       Estado actual en <strong class="text-bento-text">Anzoátegui</strong>
+      <span class="text-bento-muted font-normal"> · <span id="live-dot" class="hidden inline-flex items-center gap-1 text-bento-success text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-bento-success pulse-dot"></span> en vivo</span></span>
     </p>
   </div>
 
@@ -81,7 +83,8 @@ const centers = centersData?.map((center: any) => {
           <CenterCard 
             name={center.name} 
             address={center.address} 
-            contact={center.contact} 
+            contact={center.contact}
+            centerId={center.id}
             needs={center.needs} 
           />
         </div>
@@ -89,3 +92,65 @@ const centers = centersData?.map((center: any) => {
     )}
   </div>
 </Layout>
+
+<script>
+  import { supabase } from '../lib/supabase';
+
+  // ── Realtime subscription to center_needs ──
+  const channel = supabase
+    .channel('needs-changes')
+    .on('postgres_changes', 
+      { event: 'UPDATE', schema: 'public', table: 'center_needs' },
+      (payload) => {
+        const { center_id, category, active } = payload.new;
+        
+        // Find the matching icon in the DOM
+        const icon = document.querySelector(`.need-item[data-center-id="${center_id}"][data-category="${category}"]`);
+        if (!icon) return;
+
+        // Accent map
+        const accentMap: Record<string, { bg: string; border: string; icon: string; label: string }> = {
+          Agua:    { bg: 'bg-blue-50',    border: 'border-blue-200',    icon: 'text-blue-500',    label: '💧' },
+          Comida:  { bg: 'bg-orange-50',  border: 'border-orange-200',  icon: 'text-orange-500',  label: '🍎' },
+          Medicina:{ bg: 'bg-red-50',     border: 'border-red-200',     icon: 'text-red-500',     label: '💊' },
+          Ropa:    { bg: 'bg-purple-50',  border: 'border-purple-200',  icon: 'text-purple-500',  label: '👕' },
+        };
+
+        const a = accentMap[category] || accentMap['Agua'];
+
+        if (active) {
+          icon.className = `need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl ${a.bg} border ${a.border} transition-all duration-200`;
+          icon.setAttribute('data-active', 'true');
+          icon.innerHTML = `
+            <span class="text-xl sm:text-2xl" role="img">${a.label}</span>
+            <div class="flex flex-col min-w-0">
+              <span class="text-sm font-bold text-bento-text leading-tight">${category}</span>
+              <span class="text-xs font-semibold ${a.icon} leading-tight">Se necesita</span>
+            </div>`;
+        } else {
+          icon.className = `need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-50 transition-all duration-200`;
+          icon.setAttribute('data-active', 'false');
+          icon.innerHTML = `
+            <span class="text-xl sm:text-2xl grayscale" role="img">${a.label}</span>
+            <div class="flex flex-col min-w-0">
+              <span class="text-sm font-bold text-gray-400 leading-tight">${category}</span>
+              <span class="text-xs font-medium text-gray-400 leading-tight">Lleno</span>
+            </div>`;
+        }
+
+        // Briefly pulse the icon
+        icon.classList.add('scale-105');
+        setTimeout(() => icon.classList.remove('scale-105'), 200);
+      }
+    )
+    .subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        document.getElementById('live-dot')?.classList.remove('hidden');
+      }
+    });
+
+  // Unsubscribe on page unload
+  window.addEventListener('beforeunload', () => {
+    supabase.removeChannel(channel);
+  });
+</script>
