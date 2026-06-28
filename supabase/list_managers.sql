@@ -5,7 +5,7 @@
 CREATE OR REPLACE FUNCTION list_managers()
 RETURNS TABLE (
   id UUID,
-  email TEXT,
+  email VARCHAR(255),
   role public.user_role,
   created_at TIMESTAMPTZ
 )
