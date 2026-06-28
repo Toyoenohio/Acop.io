@@ -43,21 +43,21 @@ const centers = centersData?.map((center: any) => {
     needs
   };
 }) || [];
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY || '';
 ---
 
 <Layout title="Inicio">
-  <!-- Page Header -->
   <div class="mb-6 sm:mb-8 animate-fade-up">
     <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">
       Centros de Acopio
     </h1>
     <p class="text-sm sm:text-base text-bento-muted font-medium mt-1.5 leading-relaxed">
       Estado actual en <strong class="text-bento-text">Anzoátegui</strong>
-      <span class="text-bento-muted font-normal"> · <span id="live-dot" class="hidden inline-flex items-center gap-1 text-bento-success text-xs font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-bento-success pulse-dot"></span> en vivo</span></span>
     </p>
   </div>
 
-  <!-- Legend -->
   <div class="flex items-center gap-4 sm:gap-6 mb-6 sm:mb-8 text-xs sm:text-sm font-semibold text-bento-muted animate-fade-up delay-1">
     <span class="flex items-center gap-2">
       <span class="w-2.5 h-2.5 rounded-full bg-bento-success pulse-dot"></span>
@@ -69,7 +69,6 @@ const centers = centersData?.map((center: any) => {
     </span>
   </div>
 
-  <!-- Centers List -->
   <div class="flex flex-col gap-4 sm:gap-5">
     {centers.length === 0 ? (
       <div class="text-center py-16 sm:py-24 card-bento animate-fade-up delay-2">
@@ -94,63 +93,45 @@ const centers = centersData?.map((center: any) => {
 </Layout>
 
 <script>
-  import { supabase } from '../lib/supabase';
+  // Polling liviano: actualiza solo los íconos que cambiaron, cada 60s.
+  // Sin WebSocket, sin full page reload. Funciona en 2G.
+  const API = '{supabaseUrl}/rest/v1/center_needs?select=center_id,category,active';
+  const KEY = '{supabaseKey}';
+  
+  const iconMap = {
+    Agua:    { bg:'bg-blue-50',   border:'border-blue-200',   icon:'text-blue-500',   label:'💧' },
+    Comida:  { bg:'bg-orange-50', border:'border-orange-200', icon:'text-orange-500', label:'🍎' },
+    Medicina:{ bg:'bg-red-50',    border:'border-red-200',    icon:'text-red-500',    label:'💊' },
+    Ropa:    { bg:'bg-purple-50', border:'border-purple-200', icon:'text-purple-500', label:'👕' },
+  };
 
-  // ── Realtime subscription to center_needs ──
-  const channel = supabase
-    .channel('needs-changes')
-    .on('postgres_changes', 
-      { event: 'UPDATE', schema: 'public', table: 'center_needs' },
-      (payload) => {
-        const { center_id, category, active } = payload.new;
-        
-        // Find the matching icon in the DOM
-        const icon = document.querySelector(`.need-item[data-center-id="${center_id}"][data-category="${category}"]`);
-        if (!icon) return;
+  function updateIcon(el, category, active) {
+    const a = iconMap[category] || iconMap['Agua'];
+    el.setAttribute('data-active', String(active));
+    if (active) {
+      el.className = 'need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl ' + a.bg + ' border ' + a.border + ' transition-all duration-200';
+      el.style.opacity = '';
+      el.innerHTML = '<span class="text-xl sm:text-2xl">' + a.label + '</span><div class="flex flex-col min-w-0"><span class="text-sm font-bold text-bento-text leading-tight">' + category + '</span><span class="text-xs font-semibold ' + a.icon + ' leading-tight">Se necesita</span></div>';
+    } else {
+      el.className = 'need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl bg-gray-50 border border-gray-100 transition-all duration-200';
+      el.style.opacity = '0.5';
+      el.innerHTML = '<span class="text-xl sm:text-2xl grayscale">' + a.label + '</span><div class="flex flex-col min-w-0"><span class="text-sm font-bold text-gray-400 leading-tight">' + category + '</span><span class="text-xs font-medium text-gray-400 leading-tight">Lleno</span></div>';
+    }
+  }
 
-        // Accent map
-        const accentMap: Record<string, { bg: string; border: string; icon: string; label: string }> = {
-          Agua:    { bg: 'bg-blue-50',    border: 'border-blue-200',    icon: 'text-blue-500',    label: '💧' },
-          Comida:  { bg: 'bg-orange-50',  border: 'border-orange-200',  icon: 'text-orange-500',  label: '🍎' },
-          Medicina:{ bg: 'bg-red-50',     border: 'border-red-200',     icon: 'text-red-500',     label: '💊' },
-          Ropa:    { bg: 'bg-purple-50',  border: 'border-purple-200',  icon: 'text-purple-500',  label: '👕' },
-        };
-
-        const a = accentMap[category] || accentMap['Agua'];
-
-        if (active) {
-          icon.className = `need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl ${a.bg} border ${a.border} transition-all duration-200`;
-          icon.setAttribute('data-active', 'true');
-          icon.innerHTML = `
-            <span class="text-xl sm:text-2xl" role="img">${a.label}</span>
-            <div class="flex flex-col min-w-0">
-              <span class="text-sm font-bold text-bento-text leading-tight">${category}</span>
-              <span class="text-xs font-semibold ${a.icon} leading-tight">Se necesita</span>
-            </div>`;
-        } else {
-          icon.className = `need-item flex items-center gap-3 px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-50 transition-all duration-200`;
-          icon.setAttribute('data-active', 'false');
-          icon.innerHTML = `
-            <span class="text-xl sm:text-2xl grayscale" role="img">${a.label}</span>
-            <div class="flex flex-col min-w-0">
-              <span class="text-sm font-bold text-gray-400 leading-tight">${category}</span>
-              <span class="text-xs font-medium text-gray-400 leading-tight">Lleno</span>
-            </div>`;
-        }
-
-        // Briefly pulse the icon
-        icon.classList.add('scale-105');
-        setTimeout(() => icon.classList.remove('scale-105'), 200);
+  async function refreshNeeds() {
+    try {
+      const res = await fetch(API, { headers: { apikey: KEY, authorization: 'Bearer ' + KEY } });
+      if (!res.ok) return;
+      const needs = await res.json();
+      for (const n of needs) {
+        const el = document.querySelector('.need-item[data-center-id="' + n.center_id + '"][data-category="' + n.category + '"]');
+        if (!el) continue;
+        if ((el.getAttribute('data-active') === 'true') === n.active) continue;
+        updateIcon(el, n.category, n.active);
       }
-    )
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        document.getElementById('live-dot')?.classList.remove('hidden');
-      }
-    });
+    } catch(e) { /* silencioso en mala conexión */ }
+  }
 
-  // Unsubscribe on page unload
-  window.addEventListener('beforeunload', () => {
-    supabase.removeChannel(channel);
-  });
+  setTimeout(function() { refreshNeeds(); setInterval(refreshNeeds, 60_000); }, 60_000);
 </script>
