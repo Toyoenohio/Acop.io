@@ -1,0 +1,246 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../lib/supabase';
+
+export const prerender = false;
+
+const { centerId } = Astro.params;
+
+const { data: center } = await supabase
+  .from('centers')
+  .select('id, name, address')
+  .eq('id', centerId)
+  .single();
+
+const { data: materials } = await supabase
+  .from('materials')
+  .select('*')
+  .eq('active', true)
+  .order('name');
+
+const { data: inventory } = await supabase
+  .from('center_inventory')
+  .select(`
+    id, quantity, updated_at,
+    material:materials!center_inventory_material_id_fkey (id, name, emoji, unit)
+  `)
+  .eq('center_id', centerId)
+  .order('quantity', { ascending: false });
+
+const notFound = !center;
+---
+
+<Layout title={notFound ? 'No encontrado' : `Inventario — ${center.name}`}>
+  {notFound ? (
+    <div class="card-bento text-center py-16 animate-fade-up">
+      <span class="text-5xl block mb-4">📋</span>
+      <h1 class="text-xl font-extrabold text-bento-text mb-2">Centro no encontrado</h1>
+      <a href="/inventario" class="btn-primary text-sm">Ver inventario general</a>
+    </div>
+  ) : (
+    <div class="max-w-lg mx-auto flex flex-col gap-4 animate-fade-up">
+      <a href="/inventario" class="text-sm font-semibold text-bento-muted hover:text-bento-text">
+        ← Volver al inventario
+      </a>
+
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">{center.name}</h1>
+        <p class="text-sm text-bento-muted font-medium mt-1">{center.address}</p>
+      </div>
+
+      <!-- Inventario actual -->
+      <div class="card-bento">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b border-gray-100">
+          <h3 class="text-sm font-bold text-bento-text">Materiales disponibles</h3>
+          <span class="text-xs font-semibold text-bento-muted">
+            {inventory?.filter(i => (i as any).quantity > 0).length || 0} activos
+          </span>
+        </div>
+
+        <div class="flex flex-col gap-2" id="inventory-list">
+          {!inventory || inventory.length === 0 ? (
+            <p class="text-xs text-bento-muted italic text-center py-4">Sin materiales. Agregá desde abajo.</p>
+          ) : (
+            inventory.map((inv: any) => (
+              <div class="flex items-center gap-3 p-3 rounded-xl bg-bento-surface border border-gray-100"
+                   data-inventory-id={inv.id} data-material-id={inv.material?.id}>
+                <span class="text-2xl">{inv.material?.emoji || '📦'}</span>
+                <div class="flex-1 min-w-0">
+                  <p class="text-sm font-bold text-bento-text">{inv.material?.name || '?'}</p>
+                  <p class="text-xs text-bento-muted">{inv.material?.unit || 'unidades'}</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button onclick={`adjustQty('${inv.id}', -1)`} 
+                          class="w-8 h-8 rounded-lg bg-red-50 text-red-600 font-bold text-lg flex items-center justify-center hover:bg-red-100 active:scale-90 transition-all"
+                          {inv.quantity <= 0 ? 'disabled' : ''}>−</button>
+                  <span class="text-lg font-extrabold text-bento-text w-10 text-center qty-display">{inv.quantity}</span>
+                  <button onclick={`adjustQty('${inv.id}', 1)`}
+                          class="w-8 h-8 rounded-lg bg-green-50 text-green-600 font-bold text-lg flex items-center justify-center hover:bg-green-100 active:scale-90 transition-all">+</button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      <!-- Agregar nuevo material -->
+      <div class="card-bento">
+        <h3 class="text-sm font-bold text-bento-text mb-3">+ Agregar material</h3>
+        
+        <div class="flex flex-col sm:flex-row gap-2">
+          <select id="new-material" class="input-bento flex-1">
+            <option value="">Seleccionar material...</option>
+            {materials?.map((m: any) => (
+              <option value={m.id}>{m.emoji} {m.name} ({m.unit})</option>
+            ))}
+          </select>
+          <input type="number" id="new-qty" min="1" value="1" 
+                 class="input-bento w-24" placeholder="Cant." />
+          <button id="add-btn" class="btn-primary text-sm px-4 whitespace-nowrap">
+            Agregar
+          </button>
+        </div>
+
+        <!-- Crear nuevo tipo de material -->
+        <details class="mt-3">
+          <summary class="text-xs font-semibold text-bento-muted cursor-pointer hover:text-bento-text">
+            + Crear nuevo tipo de material
+          </summary>
+          <div class="flex flex-col sm:flex-row gap-2 mt-2">
+            <input type="text" id="new-mat-name" class="input-bento flex-1" placeholder="Nombre (ej: Colchonetas)" />
+            <input type="text" id="new-mat-emoji" class="input-bento w-20" placeholder="🛏️" maxlength="4" />
+            <input type="text" id="new-mat-unit" class="input-bento w-28" placeholder="unidades" />
+            <button id="create-mat-btn" class="btn-primary text-xs px-3 py-1.5 whitespace-nowrap">
+              Crear
+            </button>
+          </div>
+        </details>
+
+        <div id="inv-msg" class="hidden text-sm font-semibold p-2 mt-3 rounded-xl text-center"></div>
+      </div>
+    </div>
+  )}
+</Layout>
+
+<script>
+  const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
+  const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
+  const centerId = '{centerId}';
+
+  function showMsg(text: string, type: 'success' | 'error') {
+    const el = document.getElementById('inv-msg');
+    if (!el) return;
+    el.classList.remove('hidden');
+    el.className = `text-sm font-semibold p-2 mt-3 rounded-xl text-center ${
+      type === 'success' ? 'bg-green-50 text-green-700 border border-green-100' 
+                         : 'bg-red-50 text-red-700 border border-red-100'
+    }`;
+    el.textContent = text;
+    if (type === 'success') setTimeout(() => el.classList.add('hidden'), 4000);
+  }
+
+  function supabase() {
+    return {
+      from: (table: string) => ({
+        select: (q: string) => fetch(`${SUPABASE_URL}/rest/v1/${table}?select=${encodeURIComponent(q)}`, {
+          headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` }
+        }).then(r => r.json()),
+        insert: (data: any) => fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=representation' },
+          body: JSON.stringify(data)
+        }).then(r => r.json()),
+        update: (data: any) => ({
+          eq: (col: string, val: string) => fetch(`${SUPABASE_URL}/rest/v1/${table}?${col}=eq.${encodeURIComponent(val)}`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` },
+            body: JSON.stringify(data)
+          })
+        }),
+      })
+    };
+  }
+
+  // Add existing material to center
+  document.getElementById('add-btn')?.addEventListener('click', async () => {
+    const matId = (document.getElementById('new-material') as HTMLSelectElement).value;
+    const qty = parseInt((document.getElementById('new-qty') as HTMLInputElement).value) || 0;
+    if (!matId || qty < 1) return showMsg('Seleccioná un material y cantidad > 0', 'error');
+
+    const btn = document.getElementById('add-btn') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = 'Agregando...';
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/center_inventory`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=minimal' },
+      body: JSON.stringify({ center_id: centerId, material_id: matId, quantity: qty })
+    });
+
+    if (res.status === 409) {
+      // Already exists, update instead
+      await fetch(`${SUPABASE_URL}/rest/v1/center_inventory?center_id=eq.${centerId}&material_id=eq.${matId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` },
+        body: JSON.stringify({ quantity: qty })
+      }).then(async () => {
+        showMsg('✅ Cantidad actualizada', 'success');
+        setTimeout(() => window.location.reload(), 800);
+      });
+    } else if (res.ok) {
+      showMsg('✅ Material agregado', 'success');
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      showMsg('Error al agregar material', 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Agregar';
+  });
+
+  // Create new material type
+  document.getElementById('create-mat-btn')?.addEventListener('click', async () => {
+    const name = (document.getElementById('new-mat-name') as HTMLInputElement).value.trim();
+    const emoji = (document.getElementById('new-mat-emoji') as HTMLInputElement).value.trim() || '📦';
+    const unit = (document.getElementById('new-mat-unit') as HTMLInputElement).value.trim() || 'unidades';
+    if (!name) return showMsg('Ingresá un nombre', 'error');
+
+    const btn = document.getElementById('create-mat-btn') as HTMLButtonElement;
+    btn.disabled = true;
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/materials`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}`, Prefer: 'return=representation' },
+      body: JSON.stringify({ name, emoji, unit })
+    });
+
+    if (res.ok) {
+      showMsg('✅ Material creado. Recargando...', 'success');
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      const err = await res.json();
+      showMsg('Error: ' + (err.message || 'No se pudo crear'), 'error');
+    }
+    btn.disabled = false;
+  });
+
+  // Adjust quantity in-place
+  (window as any).adjustQty = async (invId: string, delta: number) => {
+    const row = document.querySelector(`[data-inventory-id="${invId}"]`) as HTMLElement;
+    const display = row?.querySelector('.qty-display') as HTMLElement;
+    if (!display) return;
+    
+    const current = parseInt(display.textContent || '0');
+    const newQty = Math.max(0, current + delta);
+    
+    await fetch(`${SUPABASE_URL}/rest/v1/center_inventory?id=eq.${invId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` },
+      body: JSON.stringify({ quantity: newQty, updated_at: new Date().toISOString() })
+    });
+
+    display.textContent = String(newQty);
+    
+    // Disable minus if at 0
+    const minusBtn = row?.querySelector('button:first-child') as HTMLButtonElement;
+    if (minusBtn) minusBtn.disabled = newQty <= 0;
+  };
+</script>

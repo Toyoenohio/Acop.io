@@ -9,8 +9,11 @@ const { data: centers } = await supabase
   .select('id, name')
   .order('name');
 
-const categories = ['Ropa', 'Medicina', 'Agua', 'Comida'];
-const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua: '💧', Comida: '🍎' };
+const { data: materials } = await supabase
+  .from('materials')
+  .select('*')
+  .eq('active', true)
+  .order('name');
 ---
 
 <Layout title="Nuevo Envío">
@@ -40,13 +43,8 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
 
       <div>
         <label class="block text-sm font-semibold text-bento-text mb-3">Material a enviar</label>
-        <div class="grid grid-cols-2 gap-3">
-          {categories.map(cat => (
-            <div>
-              <label class="text-xs font-semibold text-bento-muted mb-1 block">{catEmojis[cat]} {cat}</label>
-              <input type="number" id={`qty-${cat}`} min="0" value="0" class="input-bento" placeholder="0" />
-            </div>
-          ))}
+        <div id="items-container" class="flex flex-col gap-3">
+          <p id="select-origin-hint" class="text-xs text-bento-muted italic">Seleccioná un centro de origen para ver su inventario disponible.</p>
         </div>
       </div>
 
@@ -80,6 +78,12 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
   const btn = document.getElementById('create-btn') as HTMLButtonElement;
   const msg = document.getElementById('msg') as HTMLDivElement;
   const result = document.getElementById('result') as HTMLDivElement;
+  const fromSelect = document.getElementById('from-center') as HTMLSelectElement;
+  const itemsContainer = document.getElementById('items-container') as HTMLDivElement;
+  const hint = document.getElementById('select-origin-hint') as HTMLParagraphElement;
+
+  const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
+  const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
 
   function generateCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -99,21 +103,80 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
     if (type === 'success') setTimeout(() => msg.classList.add('hidden'), 5000);
   }
 
+  // Load inventory when origin changes
+  fromSelect?.addEventListener('change', async () => {
+    const centerId = fromSelect.value;
+    itemsContainer.innerHTML = '';
+    
+    if (!centerId) {
+      hint?.classList.remove('hidden');
+      return;
+    }
+    
+    hint?.classList.add('hidden');
+    itemsContainer.innerHTML = '<p class="text-xs text-bento-muted">Cargando inventario...</p>';
+
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/center_inventory?select=id,quantity,material_id,materials!center_inventory_material_id_fkey(name,emoji,unit)&center_id=eq.${centerId}&quantity=gt.0&order=quantity.desc`,
+      { headers: { apikey: SUPABASE_KEY, authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    
+    if (!res.ok) {
+      itemsContainer.innerHTML = '<p class="text-xs text-red-500">Error al cargar inventario.</p>';
+      return;
+    }
+
+    const items = await res.json();
+    
+    if (items.length === 0) {
+      itemsContainer.innerHTML = '<p class="text-xs text-bento-muted italic">Este centro no tiene materiales en inventario. <a href="/inventario" class="text-bento-primary font-semibold">Gestionar inventario →</a></p>';
+      return;
+    }
+
+    itemsContainer.innerHTML = items.map((inv: any) => {
+      const mat = inv.materials;
+      return `
+        <div class="flex items-center gap-3 p-3 bg-bento-surface rounded-xl border border-gray-100">
+          <span class="text-xl">${mat?.emoji || '📦'}</span>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-bold text-bento-text">${mat?.name || '?'}</p>
+            <p class="text-xs text-bento-muted">Disponible: <strong class="text-bento-text">${inv.quantity}</strong> ${mat?.unit || ''}</p>
+          </div>
+          <input type="number" 
+                 id="qty-${inv.material_id}" 
+                 min="0" max="${inv.quantity}" value="0" 
+                 class="input-bento w-20 text-sm"
+                 placeholder="0" />
+        </div>
+      `;
+    }).join('');
+  });
+
   btn?.addEventListener('click', async () => {
-    const fromId = (document.getElementById('from-center') as HTMLSelectElement).value;
+    const fromId = fromSelect.value;
     const toId = (document.getElementById('to-center') as HTMLSelectElement).value;
     const notes = (document.getElementById('notes') as HTMLTextAreaElement).value;
 
     if (!fromId || !toId) return showMsg('Seleccioná origen y destino', 'error');
     if (fromId === toId) return showMsg('Origen y destino no pueden ser iguales', 'error');
 
+    // Collect items from inventory inputs
     const items: Record<string, number> = {};
     let hasItems = false;
-    ['Ropa', 'Medicina', 'Agua', 'Comida'].forEach(cat => {
-      const qty = parseInt((document.getElementById(`qty-${cat}`) as HTMLInputElement).value) || 0;
-      if (qty > 0) hasItems = true;
-      items[cat] = qty;
-    });
+    const inputs = itemsContainer.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    
+    for (const input of inputs) {
+      const materialId = input.id.replace('qty-', '');
+      const qty = parseInt(input.value) || 0;
+      if (qty > 0) {
+        hasItems = true;
+        // Find material name
+        const row = input.closest('.flex') as HTMLElement;
+        const nameEl = row?.querySelector('.text-sm.font-bold') as HTMLElement;
+        const name = nameEl?.textContent || materialId;
+        items[name] = qty;
+      }
+    }
 
     if (!hasItems) return showMsg('Agregá al menos un item con cantidad > 0', 'error');
 
@@ -122,9 +185,6 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
 
     const code = generateCode();
     const receiveUrl = `${window.location.origin}/recibir/${code}`;
-
-    const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
-    const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
 
     const res = await fetch(`${SUPABASE_URL}/rest/v1/shipments`, {
       method: 'POST',
@@ -146,7 +206,7 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
 
     if (!res.ok) {
       const err = await res.json();
-      showMsg('Error: ' + (err.message || 'No se pudo crear el envío'), 'error');
+      showMsg('Error: ' + (err.message || 'No se pudo crear'), 'error');
       btn.disabled = false;
       btn.textContent = '📦 Generar Orden de Envío';
       return;
@@ -159,13 +219,11 @@ const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua
     link.href = receiveUrl;
     link.textContent = receiveUrl;
 
-    const qrImg = document.getElementById('qr-img') as HTMLImageElement;
-    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(receiveUrl)}`;
-    qrImg.alt = `QR para envío ${code}`;
+    (document.getElementById('qr-img') as HTMLImageElement).src = 
+      `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(receiveUrl)}`;
 
     btn.textContent = '📦 Crear Otro Envío';
     btn.disabled = false;
-
     result.scrollIntoView({ behavior: 'smooth' });
   });
 </script>
