@@ -1,0 +1,117 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { supabase } from '../lib/supabase';
+
+export const prerender = false;
+
+const { data: shipments, error } = await supabase
+  .from('shipments')
+  .select(`
+    *,
+    from_center:from_center_id(name),
+    to_center:to_center_id(name)
+  `)
+  .order('created_at', { ascending: false });
+
+const statusLabels: Record<string, string> = {
+  pending: 'Pendiente',
+  in_transit: 'En tránsito',
+  received: 'Recibido',
+  cancelled: 'Cancelado'
+};
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+  in_transit: 'bg-blue-50 text-blue-700 border-blue-200',
+  received: 'bg-green-50 text-green-700 border-green-200',
+  cancelled: 'bg-red-50 text-red-700 border-red-200'
+};
+
+const catEmojis: Record<string, string> = { Ropa: '👕', Medicina: '💊', Agua: '💧', Comida: '🍎' };
+---
+
+<Layout title="Envíos">
+  <div class="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div>
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">Envíos entre Centros</h1>
+      <p class="text-sm text-bento-muted font-medium mt-1">Historial de transferencias de material</p>
+    </div>
+    <a href="/envios/nuevo" class="btn-primary text-sm whitespace-nowrap self-start">+ Nuevo Envío</a>
+  </div>
+
+  <div class="flex flex-col gap-3">
+    {!shipments || shipments.length === 0 ? (
+      <div class="card-bento text-center py-16 sm:py-24 text-bento-muted animate-fade-up">
+        <span class="text-5xl block mb-4">📦</span>
+        <p class="text-base font-bold text-bento-text mb-1">Sin envíos registrados</p>
+        <p class="text-sm font-medium">Creá tu primer envío para transferir material entre centros.</p>
+      </div>
+    ) : (
+      shipments.map((s: any, i: number) => (
+        <div class={`card-bento !p-4 flex flex-col sm:flex-row sm:items-center gap-3 animate-fade-up delay-${Math.min(i, 3)}`}>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1">
+              <span class="font-mono font-bold text-sm text-bento-primary">{s.code}</span>
+              <span class={`text-xs font-semibold px-2 py-0.5 rounded-full border ${statusColors[s.status] || 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                {statusLabels[s.status] || s.status}
+              </span>
+            </div>
+            <p class="text-sm text-bento-text font-semibold">
+              {s.from_center?.name || 'Desconocido'} <span class="text-bento-muted mx-1">→</span> {s.to_center?.name || 'Desconocido'}
+            </p>
+            <p class="text-xs text-bento-muted mt-0.5">
+              {new Date(s.created_at).toLocaleDateString('es-VE', { dateStyle: 'medium' })}
+            </p>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 text-xs">
+            {Object.entries(s.items || {}).map(([cat, qty]: [string, any]) => (
+              qty > 0 ? <span class="bg-bento-surface px-2 py-1 rounded-lg font-semibold text-bento-text">{catEmojis[cat] || ''} {cat}: {qty}</span> : null
+            ))}
+          </div>
+          <a href={`/recibir/${s.code}`} class="text-xs font-bold text-bento-primary hover:underline whitespace-nowrap flex-shrink-0">
+            Ver detalle →
+          </a>
+        </div>
+      ))
+    )}
+  </div>
+</Layout>
+
+<script>
+  // Polling cada 60s para actualizar estados
+  const API = import.meta.env.PUBLIC_SUPABASE_URL + '/rest/v1/shipments?select=id,code,status';
+  const KEY = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+
+  const statusLabels: Record<string, string> = {
+    pending: 'Pendiente', in_transit: 'En tránsito', received: 'Recibido', cancelled: 'Cancelado'
+  };
+  const statusColors: Record<string, string> = {
+    pending: 'bg-yellow-50 text-yellow-700 border-yellow-200',
+    in_transit: 'bg-blue-50 text-blue-700 border-blue-200',
+    received: 'bg-green-50 text-green-700 border-green-200',
+    cancelled: 'bg-red-50 text-red-700 border-red-200'
+  };
+
+  async function refreshStatuses() {
+    try {
+      const res = await fetch(API, { headers: { apikey: KEY, authorization: 'Bearer ' + KEY } });
+      if (!res.ok) return;
+      const data = await res.json();
+      for (const s of data) {
+        const el = document.querySelector(`a[href="/recibir/${s.code}"]`)?.closest('.card-bento');
+        if (!el) continue;
+        const badge = el.querySelector('span.rounded-full');
+        if (badge) {
+          const current = badge.textContent?.trim();
+          const newLabel = statusLabels[s.status] || s.status;
+          if (current !== newLabel) {
+            badge.className = `text-xs font-semibold px-2 py-0.5 rounded-full border ${statusColors[s.status] || ''}`;
+            badge.textContent = newLabel;
+          }
+        }
+      }
+    } catch(e) { /* silencioso */ }
+  }
+
+  setTimeout(() => { refreshStatuses(); setInterval(refreshStatuses, 60_000); }, 30_000);
+</script>

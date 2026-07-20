@@ -1,0 +1,173 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../lib/supabase';
+
+export const prerender = false;
+
+const { code } = Astro.params;
+
+const { data: shipment, error } = await supabase
+  .from('shipments')
+  .select(`
+    *,
+    from_center:from_center_id(name, address),
+    to_center:to_center_id(name, address)
+  `)
+  .eq('code', code)
+  .single();
+
+const notFound = !shipment || error;
+
+const statusLabels: Record<string, string> = {
+  pending: 'Pendiente',
+  in_transit: 'En tránsito',
+  received: 'Recibido',
+  cancelled: 'Cancelado'
+};
+
+const categories = ['Ropa', 'Medicina', 'Agua', 'Comida'];
+const catEmojis: Record<string, string> = {
+  Ropa: '👕', Medicina: '💊', Agua: '💧', Comida: '🍎'
+};
+---
+
+<Layout title={notFound ? 'No encontrado' : `Envío ${code}`}>
+  {notFound ? (
+    <div class="card-bento text-center py-16 sm:py-24 animate-fade-up">
+      <span class="text-5xl block mb-4">📦</span>
+      <h1 class="text-xl font-extrabold text-bento-text mb-2">Envío no encontrado</h1>
+      <p class="text-sm text-bento-muted font-medium mb-4">
+        El código <strong class="font-mono text-bento-text">{code}</strong> no existe o fue eliminado.
+      </p>
+      <a href="/envios" class="btn-primary text-sm">Ver todos los envíos</a>
+    </div>
+  ) : (
+    <div class="max-w-lg mx-auto flex flex-col gap-4 animate-fade-up">
+      <a href="/envios" class="text-sm font-semibold text-bento-muted hover:text-bento-text">
+        ← Volver a envíos
+      </a>
+
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight">Recepción de Envío</h1>
+      
+      <div class="card-bento text-center !p-6">
+        <p class="text-xs text-bento-muted font-semibold uppercase tracking-wider mb-2">Código</p>
+        <p class="font-mono text-2xl sm:text-3xl font-extrabold text-bento-primary">{code}</p>
+        <span class={`inline-block mt-3 text-xs font-semibold px-3 py-1 rounded-full ${
+          shipment.status === 'received' ? 'bg-green-50 text-green-700 border border-green-200' :
+          shipment.status === 'cancelled' ? 'bg-red-50 text-red-700 border border-red-200' :
+          'bg-blue-50 text-blue-700 border border-blue-200'
+        }`}>
+          {statusLabels[shipment.status] || shipment.status}
+        </span>
+      </div>
+
+      <div class="card-bento !p-4">
+        <div class="flex items-center gap-3">
+          <div class="flex-1 text-center">
+            <p class="text-xs text-bento-muted font-semibold uppercase tracking-wider">Origen</p>
+            <p class="text-sm font-bold text-bento-text mt-1">{shipment.from_center?.name || 'Desconocido'}</p>
+            <p class="text-xs text-bento-muted">{shipment.from_center?.address || ''}</p>
+          </div>
+          <div class="flex flex-col items-center gap-1">
+            <span class="text-xl">→</span>
+            <span class="text-[10px] text-bento-muted font-semibold uppercase">Envía a</span>
+          </div>
+          <div class="flex-1 text-center">
+            <p class="text-xs text-bento-muted font-semibold uppercase tracking-wider">Destino</p>
+            <p class="text-sm font-bold text-bento-text mt-1">{shipment.to_center?.name || 'Desconocido'}</p>
+            <p class="text-xs text-bento-muted">{shipment.to_center?.address || ''}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-bento !p-4">
+        <h3 class="text-sm font-bold text-bento-text mb-3">Material incluido</h3>
+        <div class="grid grid-cols-2 gap-2">
+          {categories.map(cat => {
+            const qty = (shipment.items as any)?.[cat] || 0;
+            if (qty === 0) return null;
+            return (
+              <div class="flex items-center gap-3 p-3 bg-bento-surface rounded-xl">
+                <span class="text-2xl">{catEmojis[cat]}</span>
+                <div>
+                  <p class="text-xs font-semibold text-bento-muted">{cat}</p>
+                  <p class="text-xl font-extrabold text-bento-text">{qty}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {shipment.notes && (
+          <div class="mt-3 p-2 bg-yellow-50 rounded-xl border border-yellow-100">
+            <p class="text-xs text-yellow-800 font-medium">📝 {shipment.notes}</p>
+          </div>
+        )}
+      </div>
+
+      <div class="card-bento !p-3 text-xs text-bento-muted">
+        <p>Creado: {new Date(shipment.created_at).toLocaleDateString('es-VE', { dateStyle: 'full' })}</p>
+        {shipment.received_at && (
+          <p class="mt-1 text-green-700 font-semibold">Recibido: {new Date(shipment.received_at).toLocaleDateString('es-VE', { dateStyle: 'full' })}</p>
+        )}
+      </div>
+
+      {shipment.status !== 'received' && shipment.status !== 'cancelled' ? (
+        <button id="receive-btn" class="btn-primary text-lg py-4 flex items-center justify-center gap-2">
+          ✅ Confirmar Recepción
+        </button>
+      ) : shipment.status === 'received' ? (
+        <div class="card-bento text-center !p-5 bg-green-50 border-green-200">
+          <p class="text-base font-bold text-green-700">✅ Recibido</p>
+          <p class="text-xs text-green-600 mt-1">{new Date(shipment.received_at!).toLocaleDateString('es-VE', { dateStyle: 'full' })}</p>
+        </div>
+      ) : (
+        <div class="card-bento text-center !p-5 bg-red-50 border-red-200">
+          <p class="text-base font-bold text-red-700">❌ Cancelado</p>
+          <p class="text-xs text-red-600 mt-1">Este envío fue cancelado y no puede recibirse.</p>
+        </div>
+      )}
+
+      <div id="receive-msg" class="hidden text-sm font-semibold p-3 rounded-xl text-center"></div>
+    </div>
+  )}
+</Layout>
+
+<script>
+  const btn = document.getElementById('receive-btn');
+  const msg = document.getElementById('receive-msg');
+
+  btn?.addEventListener('click', async () => {
+    if (!confirm('¿Confirmás la recepción de este envío? Esto registrará la entrada del material y actualizará las necesidades del centro.')) return;
+    
+    btn.disabled = true;
+    btn.textContent = 'Registrando...';
+
+    const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
+    const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
+
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/shipments?code=eq.${encodeURIComponent('{code}')}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_KEY,
+        'authorization': `Bearer ${SUPABASE_KEY}`,
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({ status: 'received', received_at: new Date().toISOString() })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      if (msg) {
+        msg.classList.remove('hidden');
+        msg.className = 'text-sm font-semibold p-3 rounded-xl text-center bg-red-50 text-red-700 border border-red-100';
+        msg.textContent = 'Error: ' + (err.message || 'No se pudo registrar la recepción');
+      }
+      btn.disabled = false;
+      btn.textContent = '✅ Confirmar Recepción';
+      return;
+    }
+
+    window.location.reload();
+  });
+</script>

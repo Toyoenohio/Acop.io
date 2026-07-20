@@ -63,4 +63,10 @@ const totalCount = Object.values(needs).length;
     <CategoryIcon category="Ropa" active={needs.Ropa} centerId={centerId} />
   </div>
 
+  <!-- Enviar material -->
+  <a href={`/envios/nuevo?to=${centerId}`} 
+     class="mt-2 text-xs font-bold text-bento-primary hover:underline text-center">
+    📦 Enviar material a este centro →
+  </a>
+
 </article>
