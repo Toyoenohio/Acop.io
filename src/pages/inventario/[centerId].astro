@@ -174,6 +174,7 @@ const notFound = !center;
 
   // Add existing material to center
   document.getElementById('add-btn')?.addEventListener('click', async () => {
+    try {
     const matId = (document.getElementById('new-material') as HTMLSelectElement).value;
     const qty = parseInt((document.getElementById('new-qty') as HTMLInputElement).value) || 0;
     if (!matId) return showMsg('Seleccioná un material de la lista', 'error');
@@ -208,6 +209,11 @@ const notFound = !center;
 
     btn.disabled = false;
     btn.textContent = 'Agregar stock';
+    } catch (e: any) {
+      showMsg('Error de conexión: ' + (e.message || 'No se pudo conectar a Supabase. ¿Están configuradas las variables de entorno PUBLIC_SUPABASE_URL y PUBLIC_SUPABASE_ANON_KEY en Cloudflare Pages?'), 'error');
+      const btn = document.getElementById('add-btn') as HTMLButtonElement;
+      if (btn) { btn.disabled = false; btn.textContent = 'Agregar stock'; }
+    }
   });
 
   // Create new material type
