@@ -17,6 +17,7 @@ const { data: shipment, error } = await supabase
   .single();
 
 const notFound = !shipment || error;
+const codeJson = JSON.stringify(code);
 
 const statusLabels: Record<string, string> = {
   pending: 'Pendiente',
@@ -145,7 +146,7 @@ const catEmojis: Record<string, string> = {
     const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
     const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
 
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/shipments?code=eq.${encodeURIComponent('{code}')}`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/shipments?code=eq.${encodeURIComponent({codeJson})}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
