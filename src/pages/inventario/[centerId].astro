@@ -28,7 +28,6 @@ const { data: inventory } = await supabase
   .order('quantity', { ascending: false });
 
 const notFound = !center;
-const centerIdJson = JSON.stringify(centerId);
 ---
 
 <Layout title={notFound ? 'No encontrado' : `Inventario — ${center.name}`}>
@@ -148,10 +147,9 @@ const centerIdJson = JSON.stringify(centerId);
   )}
 </Layout>
 
-<script>
+<script define:vars={{ centerId }}>
   const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
   const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
-  const centerId = {centerIdJson};
 
   // Preserve <details> open state across reloads
   const detailsEl = document.getElementById('new-material-details') as HTMLDetailsElement;
