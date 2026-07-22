@@ -22,51 +22,71 @@ const { data: materials } = await supabase
       ← Volver a envíos
     </a>
     
-    <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight mb-6">Nuevo Envío</h1>
+    <h1 class="text-2xl sm:text-3xl font-extrabold text-bento-text tracking-tight mb-2">Nuevo envío entre centros</h1>
+    <p class="text-sm text-bento-muted mb-6">Transferí materiales de un centro de acopio a otro. El destino recibe un código QR para confirmar la recepción.</p>
 
-    <div class="card-bento flex flex-col gap-4">
+    <div class="card-bento flex flex-col gap-5">
+      <!-- Origen -->
       <div>
-        <label class="block text-sm font-semibold text-bento-text mb-2">Centro de origen</label>
-        <select id="from-center" class="input-bento">
-          <option value="">Seleccionar...</option>
+        <label class="block text-sm font-bold text-bento-text mb-1.5" for="from-center">
+          📤 ¿De qué centro sale el material?
+        </label>
+        <p class="text-xs text-bento-muted mb-2">El inventario de este centro se descuenta automáticamente al crear el envío.</p>
+        <select id="from-center" class="input-bento w-full">
+          <option value="">— Elegí el centro que entrega —</option>
+          {centers?.map((c: any) => <option value={c.id}>{c.name}</option>)}
+        </select>
+        <p class="text-xs text-bento-muted mt-1 hidden" id="origin-warning"></p>
+      </div>
+
+      <!-- Destino -->
+      <div>
+        <label class="block text-sm font-bold text-bento-text mb-1.5" for="to-center">
+          📥 ¿A qué centro va el envío?
+        </label>
+        <p class="text-xs text-bento-muted mb-2">El material aparecerá en el inventario de este centro cuando confirmen la recepción.</p>
+        <select id="to-center" class="input-bento w-full">
+          <option value="">— Elegí el centro que recibe —</option>
           {centers?.map((c: any) => <option value={c.id}>{c.name}</option>)}
         </select>
       </div>
 
+      <!-- Items desde inventario -->
       <div>
-        <label class="block text-sm font-semibold text-bento-text mb-2">Centro de destino</label>
-        <select id="to-center" class="input-bento">
-          <option value="">Seleccionar...</option>
-          {centers?.map((c: any) => <option value={c.id}>{c.name}</option>)}
-        </select>
-      </div>
-
-      <div>
-        <label class="block text-sm font-semibold text-bento-text mb-3">Material a enviar</label>
+        <label class="block text-sm font-bold text-bento-text mb-1.5">
+          📦 Materiales a incluir en el envío
+        </label>
+        <p class="text-xs text-bento-muted mb-2">Seleccioná un centro de origen arriba para ver qué tiene disponible. Poné la cantidad que querés transferir.</p>
         <div id="items-container" class="flex flex-col gap-3">
-          <p id="select-origin-hint" class="text-xs text-bento-muted italic">Seleccioná un centro de origen para ver su inventario disponible.</p>
+          <p id="select-origin-hint" class="text-xs text-bento-muted italic bg-bento-surface p-3 rounded-xl border border-dashed border-gray-200 text-center">
+            👆 Primero elegí un centro de origen para ver su inventario disponible
+          </p>
         </div>
       </div>
 
+      <!-- Notas -->
       <div>
-        <label class="block text-sm font-semibold text-bento-text mb-2">Notas (opcional)</label>
-        <textarea id="notes" class="input-bento" rows="2" placeholder="Ej: Enviar con prioridad, frágil..."></textarea>
+        <label class="block text-sm font-bold text-bento-text mb-1.5" for="notes">
+          📝 Instrucciones o notas del envío
+        </label>
+        <p class="text-xs text-bento-muted mb-2">Cualquier detalle útil para quien recibe: urgencia, condiciones especiales, persona de contacto.</p>
+        <textarea id="notes" class="input-bento w-full" rows="3" placeholder="Ej: El destinatario es Juan Pérez, entregar solo en horario de oficina. Los paquetes frágiles van marcados."></textarea>
       </div>
 
-      <button id="create-btn" class="btn-primary mt-2 py-3 text-base">
-        📦 Generar Orden de Envío
+      <button id="create-btn" class="btn-primary mt-2 py-3 text-base w-full">
+        📦 Generar orden de envío
       </button>
 
       <div id="msg" class="hidden text-sm font-semibold p-3 rounded-xl text-center"></div>
 
       <div id="result" class="hidden flex flex-col items-center gap-4 p-4 sm:p-6 bg-green-50 rounded-2xl border border-green-200 mt-2 animate-fade-up">
-        <p class="text-sm font-bold text-green-800">✅ Orden creada</p>
+        <p class="text-sm font-bold text-green-800">✅ Orden de envío creada</p>
         <p class="font-mono text-xl sm:text-2xl font-extrabold text-bento-text" id="result-code"></p>
         <div class="bg-white p-3 rounded-xl shadow-sm">
-          <img id="qr-img" src="" alt="QR Code" width="200" height="200" class="rounded-lg" />
+          <img id="qr-img" src="" alt="Código QR para confirmar recepción del envío" width="200" height="200" class="rounded-lg" />
         </div>
         <p class="text-xs text-green-700 text-center font-medium">
-          Escaneá este QR o compartí el enlace para recibir el paquete
+          Compartí este QR o el enlace con el centro de destino. Al escanearlo confirman que recibieron el paquete.
         </p>
         <a id="result-link" href="#" target="_blank" class="text-sm font-bold text-bento-primary break-all text-center hover:underline"></a>
       </div>
@@ -81,9 +101,25 @@ const { data: materials } = await supabase
   const fromSelect = document.getElementById('from-center') as HTMLSelectElement;
   const itemsContainer = document.getElementById('items-container') as HTMLDivElement;
   const hint = document.getElementById('select-origin-hint') as HTMLParagraphElement;
+  const originWarning = document.getElementById('origin-warning') as HTMLParagraphElement;
 
   const SUPABASE_URL = (import.meta as any).env?.PUBLIC_SUPABASE_URL || '';
   const SUPABASE_KEY = (import.meta as any).env?.PUBLIC_SUPABASE_ANON_KEY || '';
+
+  // Persist user quantities across origin changes
+  const savedQuantities = new Map<string, number>();
+  let currentOriginId = '';
+
+  function collectCurrentQuantities(): Map<string, number> {
+    const qtys = new Map<string, number>();
+    const inputs = itemsContainer.querySelectorAll<HTMLInputElement>('input[type="number"]');
+    for (const input of inputs) {
+      const materialId = input.id.replace('qty-', '');
+      const val = parseInt(input.value) || 0;
+      if (val > 0) qtys.set(materialId, val);
+    }
+    return qtys;
+  }
 
   function generateCode(): string {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -106,7 +142,16 @@ const { data: materials } = await supabase
   // Load inventory when origin changes
   fromSelect?.addEventListener('change', async () => {
     const centerId = fromSelect.value;
+
+    // Guardar cantidades del centro actual antes de limpiar
+    const previousQtys = collectCurrentQuantities();
+    for (const [matId, qty] of previousQtys) {
+      savedQuantities.set(`${currentOriginId}:${matId}`, qty);
+    }
+    currentOriginId = centerId;
+
     itemsContainer.innerHTML = '';
+    originWarning.classList.add('hidden');
     
     if (!centerId) {
       hint?.classList.remove('hidden');
@@ -114,7 +159,7 @@ const { data: materials } = await supabase
     }
     
     hint?.classList.add('hidden');
-    itemsContainer.innerHTML = '<p class="text-xs text-bento-muted">Cargando inventario...</p>';
+    itemsContainer.innerHTML = '<p class="text-xs text-bento-muted py-3 text-center">⏳ Buscando inventario disponible...</p>';
 
     const res = await fetch(
       `${SUPABASE_URL}/rest/v1/center_inventory?select=id,quantity,material_id,materials!center_inventory_material_id_fkey(name,emoji,unit)&center_id=eq.${centerId}&quantity=gt.0&order=quantity.desc`,
@@ -122,34 +167,44 @@ const { data: materials } = await supabase
     );
     
     if (!res.ok) {
-      itemsContainer.innerHTML = '<p class="text-xs text-red-500">Error al cargar inventario.</p>';
+      itemsContainer.innerHTML = '<p class="text-xs text-red-500 py-3 text-center">❌ No se pudo cargar el inventario. ¿Está configurado Supabase?</p>';
       return;
     }
 
     const items = await res.json();
     
     if (items.length === 0) {
-      itemsContainer.innerHTML = '<p class="text-xs text-bento-muted italic">Este centro no tiene materiales en inventario. <a href="/inventario" class="text-bento-primary font-semibold">Gestionar inventario →</a></p>';
+      itemsContainer.innerHTML = '<p class="text-xs text-bento-muted italic py-3 text-center bg-bento-surface rounded-xl border border-dashed border-gray-200">Este centro no tiene materiales registrados. <a href="/inventario" class="text-bento-primary font-bold underline">Ir a gestionar inventario →</a></p>';
       return;
     }
 
+    let restoredCount = 0;
+
     itemsContainer.innerHTML = items.map((inv: any) => {
       const mat = inv.materials;
+      const key = `${centerId}:${inv.material_id}`;
+      const savedQty = savedQuantities.get(key) || 0;
+      if (savedQty > 0) restoredCount++;
       return `
-        <div class="flex items-center gap-3 p-3 bg-bento-surface rounded-xl border border-gray-100">
+        <div class="flex items-center gap-3 p-3 bg-bento-surface rounded-xl border border-gray-100 hover:border-bento-primary/30 transition-colors">
           <span class="text-xl">${mat?.emoji || '📦'}</span>
           <div class="flex-1 min-w-0">
-            <p class="text-sm font-bold text-bento-text">${mat?.name || '?'}</p>
-            <p class="text-xs text-bento-muted">Disponible: <strong class="text-bento-text">${inv.quantity}</strong> ${mat?.unit || ''}</p>
+            <p class="text-sm font-bold text-bento-text">${mat?.name || 'Material sin nombre'}</p>
+            <p class="text-xs text-bento-muted">Stock actual: <strong class="text-bento-text">${inv.quantity}</strong> ${mat?.unit || 'unid.'}</p>
           </div>
           <input type="number" 
                  id="qty-${inv.material_id}" 
-                 min="0" max="${inv.quantity}" value="0" 
-                 class="input-bento w-20 text-sm"
-                 placeholder="0" />
+                 min="0" max="${inv.quantity}" value="${savedQty}" 
+                 class="input-bento w-20 text-sm text-center font-bold"
+                 placeholder="0"
+                 aria-label="Cantidad a enviar de ${mat?.name || 'material'}" />
         </div>
       `;
     }).join('');
+
+    if (restoredCount > 0) {
+      showMsg(`♻️ Se restauraron ${restoredCount} cantidades que ya habías escrito`, 'success');
+    }
   });
 
   btn?.addEventListener('click', async () => {
@@ -157,8 +212,9 @@ const { data: materials } = await supabase
     const toId = (document.getElementById('to-center') as HTMLSelectElement).value;
     const notes = (document.getElementById('notes') as HTMLTextAreaElement).value;
 
-    if (!fromId || !toId) return showMsg('Seleccioná origen y destino', 'error');
-    if (fromId === toId) return showMsg('Origen y destino no pueden ser iguales', 'error');
+    if (!fromId) return showMsg('Seleccioná el centro que entrega el material', 'error');
+    if (!toId) return showMsg('Seleccioná el centro que recibe el envío', 'error');
+    if (fromId === toId) return showMsg('El centro de origen y destino no pueden ser el mismo', 'error');
 
     // Collect items from inventory inputs
     const items: Record<string, number> = {};
@@ -170,7 +226,6 @@ const { data: materials } = await supabase
       const qty = parseInt(input.value) || 0;
       if (qty > 0) {
         hasItems = true;
-        // Find material name
         const row = input.closest('.flex') as HTMLElement;
         const nameEl = row?.querySelector('.text-sm.font-bold') as HTMLElement;
         const name = nameEl?.textContent || materialId;
@@ -178,10 +233,10 @@ const { data: materials } = await supabase
       }
     }
 
-    if (!hasItems) return showMsg('Agregá al menos un item con cantidad > 0', 'error');
+    if (!hasItems) return showMsg('Indicá al menos un material con cantidad mayor a 0', 'error');
 
     btn.disabled = true;
-    btn.textContent = 'Creando...';
+    btn.textContent = '⏳ Creando envío...';
 
     const code = generateCode();
     const receiveUrl = `${window.location.origin}/recibir/${code}`;
@@ -206,9 +261,9 @@ const { data: materials } = await supabase
 
     if (!res.ok) {
       const err = await res.json();
-      showMsg('Error: ' + (err.message || 'No se pudo crear'), 'error');
+      showMsg('Error al crear el envío: ' + (err.message || 'Revisá que las tablas estén creadas en Supabase'), 'error');
       btn.disabled = false;
-      btn.textContent = '📦 Generar Orden de Envío';
+      btn.textContent = '📦 Generar orden de envío';
       return;
     }
 
@@ -222,7 +277,7 @@ const { data: materials } = await supabase
     (document.getElementById('qr-img') as HTMLImageElement).src = 
       `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(receiveUrl)}`;
 
-    btn.textContent = '📦 Crear Otro Envío';
+    btn.textContent = '📦 Crear otro envío';
     btn.disabled = false;
     result.scrollIntoView({ behavior: 'smooth' });
   });
