@@ -33,7 +33,7 @@ import Layout from '../layouts/Layout.astro';
         <!-- Create Manager Form (collapsible) -->
         <div id="create-manager-form" class="hidden mb-5 p-4 bg-gray-50 rounded-2xl border border-gray-100">
           <h4 class="text-sm font-bold text-bento-text mb-3">Nuevo gestor</h4>
-          <div class="flex flex-col sm:flex-row gap-3">
+          <div class="flex flex-col gap-3">
             <input type="email" id="manager-email" placeholder="email@ejemplo.com" required
                    class="input-bento flex-1">
             <input type="password" id="manager-password" placeholder="Contraseña" required minlength="6"
@@ -58,7 +58,7 @@ import Layout from '../layouts/Layout.astro';
         </h3>
         
         <form id="create-center-form" class="flex flex-col gap-4">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 gap-4">
             <div>
               <label class="block text-sm font-semibold text-bento-text mb-2">Nombre del centro</label>
               <input type="text" id="center-name" required class="input-bento" placeholder="Ej. Bomberos de Lechería">

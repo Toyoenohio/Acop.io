@@ -97,7 +97,7 @@ const centerIdJson = JSON.stringify(centerId);
         <h3 class="text-sm font-bold text-bento-text mb-1">➕ Sumar material al inventario</h3>
         <p class="text-xs text-bento-muted mb-3">Agregá stock de un tipo de material que ya existe en el catálogo. Si necesitás crear un tipo nuevo, expandí la sección de abajo.</p>
         
-        <div class="flex flex-col sm:flex-row gap-2">
+        <div class="flex flex-col gap-2">
           <select id="new-material" class="input-bento flex-1">
             <option value="">— ¿Cuál material querés agregar? —</option>
             {materials?.map((m: any) => (
@@ -121,7 +121,7 @@ const centerIdJson = JSON.stringify(centerId);
             🏷️ ¿El material no está en la lista? Crear un tipo nuevo
           </summary>
           <p class="text-xs text-bento-muted mt-2 mb-2">Definí el nombre, emoji y unidad de medida. Después de crearlo, podrás asignarle stock a este centro.</p>
-          <div class="flex flex-col sm:flex-row gap-2">
+          <div class="flex flex-col gap-2">
             <div class="flex-1">
               <label class="text-[11px] font-semibold text-bento-muted block mb-0.5">Nombre del material</label>
               <input type="text" id="new-mat-name" class="input-bento w-full" placeholder="Ej: Colchonetas ignífugas" />
